@@ -8,6 +8,8 @@ const usersRouter = require('./controllers/usersRouter')
 const middleware = require('./utils/middleware')
 const logger = require('./utils/logger')
 const mongoose = require('mongoose')
+const login = require('./controllers/login')
+
 
 mongoose.set('strictQuery', false)
 
@@ -25,8 +27,10 @@ app.use(cors())
 app.use(express.json())
 app.use(middleware.requestLogger)
 
+
 app.use('/api/blogs', blogRouter)
 app.use('/api/users', usersRouter)
+app.use('/api/login', login)
 
 app.use(middleware.unknownEndpoint)
 app.use(middleware.errorHandler)

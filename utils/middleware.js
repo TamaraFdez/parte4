@@ -23,12 +23,52 @@ const errorHandler = (error, request, response, next) => {
     return response.status(400).json({ error: 'expected `username` to be unique' });
   }
 
-  // Manejo de errores generales
+ 
   return response.status(500).json({ error: 'Internal Server Error' });
 };
+const jwt = require('jsonwebtoken');
+
+const tokenExtractor = (request, response, next) => {
+  const authorization = request.get('authorization');
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    request.token = authorization.substring(7);
+  } else {
+    request.token = null;
+  }
+  next();
+};
+
+const userExtractor = (request, response, next) => {
+    
+    if (!request.token) {
+      return response.status(401).json({ error: 'Token missing' });
+    }
+  
+ 
+    let decodedToken;
+    try {
+      decodedToken = jwt.verify(request.token, process.env.SECRET);
+    } catch (error) {
+      return response.status(401).json({ error: 'Token invalid' });
+    }
+  
+   
+    if (!decodedToken.id) {
+      return response.status(401).json({ error: 'Token invalid' });
+    }
+  
+    
+    request.user = decodedToken;
+    next();
+  };
+  
+
+
 
 module.exports = {
   requestLogger,
   unknownEndpoint,
   errorHandler,
+  tokenExtractor, 
+  userExtractor 
 };

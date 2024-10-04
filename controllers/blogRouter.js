@@ -1,6 +1,7 @@
 const blogRouter = require('express').Router();
 const Blog = require('../models/blog');
 const User = require('../models/user'); 
+const { tokenExtractor, userExtractor } = require('../utils/middleware');
 
 blogRouter.get('/', async (request, response) => {
   const blogs = await Blog.find({})
@@ -19,60 +20,82 @@ blogRouter.get('/:id', async (request, response) => {
   response.json(blog);
 });
 
-blogRouter.post('/', async (request, response) => {
+blogRouter.post('/', tokenExtractor, userExtractor, async (request, response) => {
   const body = request.body;
 
   if (!body.title || !body.author || !body.url) {
     return response.status(400).json({ error: 'El título, el autor y la URL son obligatorios' });
   }
 
- 
-  const user = await User.findOne({}); 
-  if (!user) {
-    return response.status(400).json({ error: 'No se encontró un usuario' });
+  const newBlog = new Blog({ ...body, creator: request.user.id });
+
+  try {
+    const savedBlog = await newBlog.save();
+   
+    const user = await User.findById(request.user.id);
+    user.Blogs.push(savedBlog._id);
+    await user.save();
+
+    response.status(201).json(savedBlog);
+  } catch (error) {
+
+    return response.status(500).json({ error: 'Error al guardar el blog: ' + error.message });
   }
-
-  // Crea el nuevo blog
-  const newBlog = new Blog({ ...body, creator: user._id });
-  const savedBlog = await newBlog.save();
-
-  // Agrega el ID del nuevo blog al array Blogs del usuario
-  user.Blogs.push(savedBlog._id);
-  await user.save(); 
-
-  response.status(201).json(savedBlog);
 });
 
 
-blogRouter.put('/:id', async (request, response) => {
+blogRouter.put('/:id', tokenExtractor, userExtractor, async (request, response) => {
   const { id } = request.params;
   const body = request.body;
 
   if (!body.title || !body.author) {
-    return response.status(400).json({ error: 'El título, el autor y la URL son obligatorios' });
+    return response.status(400).json({ error: 'El título y el autor son obligatorios' });
   }
 
-  const updatedBlog = await Blog.findByIdAndUpdate(id, body, { new: true, runValidators: true })
-    .populate('creator', { username: 1, name: 1 }); 
+  try {
+    const updatedBlog = await Blog.findByIdAndUpdate(id, body, { new: true, runValidators: true })
+      .populate('creator', { username: 1, name: 1 });
 
-  if (!updatedBlog) {
-    return response.status(404).json({ error: 'Blog not found' });
+    if (!updatedBlog) {
+      return response.status(404).json({ error: 'Blog not found' });
+    }
+
+    response.json(updatedBlog);
+  } catch (error) {
+   
+    if (error.name === 'CastError') {
+      return response.status(400).json({ error: 'malformatted id' });
+    } else if (error.name === 'ValidationError') {
+      return response.status(400).json({ error: error.message });
+    }
+    
+    response.status(500).json({ error: 'Error al actualizar el blog: ' + error.message });
   }
-
-  response.json(updatedBlog);
 });
 
-blogRouter.delete('/:id', async (request, response) => {
+blogRouter.delete('/:id', tokenExtractor, userExtractor, async (request, response) => {
   const id = request.params.id;
 
-  const deletedBlog = await Blog.findByIdAndDelete(id);
+  try {
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return response.status(404).json({ error: 'Blog not found' });
+    }
 
-  if (!deletedBlog) {
-    return response.status(404).json({ error: 'Blog not found' });
+    if (blog.creator.toString() !== request.user.id) {
+      return response.status(403).json({ error: 'No tienes permisos para eliminar este blog' });
+    }
+
+    await Blog.findByIdAndDelete(id);
+    response.status(204).end();
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return response.status(400).json({ error: 'malformatted id' });
+    }
+    response.status(500).json({ error: 'Internal Server Error' });
   }
-
-  response.status(204).end();
 });
+
 
 module.exports = blogRouter;
 

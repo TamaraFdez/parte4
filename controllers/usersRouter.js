@@ -3,7 +3,7 @@ const User = require('../models/user');
 const bcrypt = require('bcrypt');
 
 
-// Ruta para obtener todos los usuarios
+
 usersRouter.get('/', async (request, response) => {
   try {
     const users = await User.find({}).populate('Blogs'); 
@@ -17,7 +17,7 @@ usersRouter.get('/', async (request, response) => {
 usersRouter.post('/', async (request, response) => {
   const { username, name, password } = request.body;
 
-  // Validar que username y password sean obligatorios y tengan al menos 3 caracteres
+ 
   if (!username || username.length < 3) {
     return response.status(400).json({ error: 'El username debe tener al menos 3 caracteres' });
   }
@@ -26,7 +26,7 @@ usersRouter.post('/', async (request, response) => {
     return response.status(400).json({ error: 'La contraseña debe tener al menos 3 caracteres' });
   }
 
-  // Verificar si el nombre de usuario ya existe
+ 
   const existingUser = await User.findOne({ username });
   if (existingUser) {
     return response.status(400).json({ error: 'El username ya existe' });
